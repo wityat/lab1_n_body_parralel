@@ -1,0 +1,1 @@
+# lab1_n_body_parralel
