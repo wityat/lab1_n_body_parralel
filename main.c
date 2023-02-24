@@ -2,10 +2,9 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <math.h>
+#include <string.h>
 
 #define DELTA_T 0.05 // time step
-#define EPSILON 1 // softening factor
-#define NUM_THREADS 25
 
 // structure to represent a 2D vector
 typedef struct {
@@ -34,13 +33,13 @@ int bodiesN, timeSteps;
 
 // function to calculate the distance between two 2D vectors
 double distance(vector_t v1, vector_t v2) {
-    return sqrt(pow(v1.x - v2.x, 2) + pow(v1.y - v2.y, 2));
+    return sqrt((v1.x - v2.x) *(v1.x - v2.x) + (v1.y - v2.y) * (v1.y - v2.y));
 }
 
 // function to calculate the force between two bodies
 vector_t force(body_t b1, body_t b2) {
     double r = distance(b1.position, b2.position);
-    double f = GravConstant * b1.mass * b2.mass / pow(r, 2);
+    double f = GravConstant * b1.mass * b2.mass / r*r;
     vector_t direction = { (b2.position.x - b1.position.x) / r, (b2.position.y - b1.position.y) / r };
     vector_t force_vector = { f * direction.x, f * direction.y };
     return force_vector;
@@ -96,13 +95,17 @@ void resolve_collisions(body_t *bodies)
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
+    if (argc != 3) {
         fprintf(stderr, "Usage: %s fileName\n", argv[0]);
         return EXIT_FAILURE;
     }
+
+    clock_t start, end;
+    double cpu_time_used;
+    start = clock();
+
     char* fileName = argv[1];
-
-
+    int NUM_THREADS = atoi(argv[2]);
 
     // read body data from file
     FILE *fp = fopen(fileName, "r");
@@ -128,7 +131,7 @@ int main(int argc, char* argv[]) {
     }
 
     fclose(fp);
-// create threads to update the positions and velocities of the bodies
+    // create threads to update the positions and velocities of the bodies
     int num_threads = NUM_THREADS < bodiesN ? NUM_THREADS : bodiesN; // use at most NUM_THREADS threads
     pthread_t *threads = (pthread_t *) malloc(num_threads * sizeof(pthread_t));
     thread_args_t *thread_args = (thread_args_t *) malloc(num_threads * sizeof(thread_args_t));
@@ -140,7 +143,8 @@ int main(int argc, char* argv[]) {
     int bodies_per_thread = bodiesN / num_threads;
 
     FILE *f;
-    f = fopen("output.csv", "w+");
+    memcpy(fileName,"out",2);
+    f = fopen(fileName, "w+");
 
     for (int j = 0; j < timeSteps; j++)
     {
@@ -171,7 +175,6 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < bodiesN; i++)
             fprintf(f, "%lf, %lf, ", bodies[i].position.x, bodies[i].position.y);
         fprintf(f, "\n");
-
     }
     fclose(f);
 
@@ -180,6 +183,10 @@ int main(int argc, char* argv[]) {
     free(bodies);
     free(threads);
     free(thread_args);
+
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("%f\n", cpu_time_used);
 
     return EXIT_SUCCESS;
 }
